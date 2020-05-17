@@ -43,24 +43,60 @@
 
 #include "Skeleton.h"
 
+//PF_Pixel8 Mirror(PF_LayerDef layer, int x, int y) {
+
+	//PF_GET_PIXEL_DATA8();
+	//*in_data->utils->get_pixel_data8();
+//};
+
 //bool myIteration8(PF_LayerDef* inL,)
 
+//释放套件内存的东西，其实在 AEFX_SuiteHelper.h里面就有现成的
+PF_Err DOLAG_ReleaseSuite(PF_InData* in_data,
+	PF_OutData* out_data,
+	const char* name,
+	int32_t			version,
+	const char* error_stringPC0)
+{
+	PF_Err			err = PF_Err_NONE;
+	SPBasicSuite* bsuite;
+
+	bsuite = in_data->pica_basicP;
+
+	if (bsuite) {
+		(*bsuite->ReleaseSuite)((char*)name, version);
+	}
+	else {
+		err = PF_Err_BAD_CALLBACK_PARAM;
+	}
+
+	if (err) {
+		const char* error_stringPC = error_stringPC0 ? error_stringPC0 : "Not able to release AEFX Suite.";
+
+		out_data->out_flags |= PF_OutFlag_DISPLAY_ERROR_MESSAGE;
+
+		PF_SPRINTF(out_data->return_msg, error_stringPC);
+	}
+
+	return err;
+}
 
 bool isOnScreen(PF_LayerDef* layer, int x, int y) {
 	return (x > -1 && y > -1 && x < layer->width && y < layer->height);
-}//�ж��Ƿ�����Ļ��
-
+}//判断是否在屏幕内
 PF_Pixel16* getPixel16(PF_LayerDef* layer, int x, int y) {
 	return (PF_Pixel16*)((char*)layer->data + (y * layer->rowbytes) + (x * sizeof(PF_Pixel16)));
-}//16bits��
-
+}//16bits的
+//然后你发现本身就有获取像素的函数,不过有、麻烦
+//PF_GET_PIXEL_DATA8()
+// PF_GET_PIXEL_DATA16();不过好像得有*in_data才能用
 PF_Pixel8* getPixel8(PF_LayerDef* layer, int x, int y) {
 	return (PF_Pixel8*)((char*)layer->data + (y * layer->rowbytes) + (x * sizeof(PF_Pixel8)));
-};//���ڻ�ȡָ��xy��������ص��ڴ��ַ
+};//用于获取指定xy坐标的像素的内存地址
 
 float lerp(float Dmin, float Dmax, float Smin, float Smax, float value) {
 	return (float)((value - Smin) / (Smax - Smin) * (Dmax - Dmin) + Dmin);
-}//����ӳ�亯��
+}//线性映射函数
 
 static PF_Err 
 About (	
@@ -69,6 +105,7 @@ About (
 	PF_ParamDef		*params[],
 	PF_LayerDef		*output )
 {
+	//short map;
 	AEGP_SuiteHandler suites(in_data->pica_basicP);
 	
 	suites.ANSICallbacksSuite1()->sprintf(	out_data->return_msg,
@@ -108,9 +145,12 @@ ParamsSetup (
 	PF_LayerDef		*output )
 {
 	PF_Err		err		= PF_Err_NONE;
-	PF_ParamDef	def;	
+	PF_ParamDef	def;
+	
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_POPUPX("Displace Mode", 4, 1, "Radial|Vector|Direct|Twirl", NULL,isRadial);
+	//PF_ADD_TOPICX()用这个创建文件夹
+	PF_ADD_POPUPX("Displace Mode", 4, 1, "Radial|Vector(Only Red and Blue Channel)|Direct|Twirl", NULL,isRadial);
+	//PF_ADD_POPUPX("Vector Channel(just for vector)", 4, 1, "Red and Blue|Red and Green|Blue and Green|Black and White", NULL, isRadial);
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_FLOAT_SLIDERX(	"Length", 
 							-50000, 
@@ -128,15 +168,20 @@ ParamsSetup (
 	PF_ADD_LAYER("Map Layer",PF_LayerDefault_MYSELF, DisplaceMap);
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_POINT("Displacement Center", in_data->width / 2, in_data->height / 2,false,DisCenter);
-	//AEFX_CLR_STRUCT(def);//���п���ɾ������Ϊcheckboxx������������
+	//AEFX_CLR_STRUCT(def);//这行可以删除，因为checkboxx本身就有清零
 	PF_ADD_CHECKBOXX("Apply Transparent",1,0 , isTransparent);
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_ANGLE("Direct Angle", ANGLE_DEFT, DisAngle);
+	AEFX_CLR_STRUCT(def);
+	PF_ADD_POPUPX("Edge Repeat",3,1,"None|Repear|Mirror",NULL,DisEdge);//新增了一个边缘环绕模式
 	AEFX_CLR_STRUCT(def);
 	out_data->num_params = PARAMS_NUM;
 
 	return err;
 }
+
+
+
 
 static PF_Err
 MySimpleGainFunc16 (
@@ -196,7 +241,7 @@ MySimpleGainFunc16 (
 			if (mapP->alpha != 0) {
 				dx = xL - x_center;
 				dy = yL - y_center;
-				double scr_angle = atan2(-1 * (double)dy, (double)dx);//��ʼ�����ص����ĺ�x��������нǵĻ�����
+				double scr_angle = atan2(-1 * (double)dy, (double)dx);//开始该像素到中心和x轴正半轴夹角的弧度制
 				double des_angle = scr_angle + 3.14159265358 / 2.0;
 				int dsts = (int)hypot(dx, dy);
 				x_fin = floor(dsts * sin(des_angle + giP->angle * giP->length * lumn / 1000.0) + giP->layer.width / 2);
@@ -307,7 +352,7 @@ MySimpleGainFunc8 (
 				if (mapP->alpha != 0) {
 					dx = xL - x_center;
 					dy = yL - y_center;
-					double scr_angle = atan2(-1 * (double)dy, (double)dx);//��ʼ�����ص����ĺ�x��������нǵĻ�����
+					double scr_angle = atan2(-1 * (double)dy, (double)dx);//开始该像素到中心和x轴正半轴夹角的弧度制
 					double des_angle = scr_angle + 3.14159265358 / 2.0;
 					//double des_angle =  - giP->length * lumn/ 1000.0;
 					int dsts = (int)hypot(dx, dy);
@@ -334,6 +379,11 @@ MySimpleGainFunc8 (
 					outP->green = pix->green;
 					outP->blue = pix->blue;
 				}*/
+
+				
+
+
+
 				outP->alpha = pix->alpha*(1-twirlAlpha);
 				outP->red = pix->red;
 				outP->green = pix->green;
@@ -378,18 +428,29 @@ Render (
 	PF_LayerDef		*output )
 {
 	PF_Err				err		= PF_Err_NONE;
+	//这是一个pica句柄的类，里面包含了各种各样pica的suite及其函数
+	//句柄是指向某个基类或者派生类的可变的指针
+	//这个类里面明确禁止了通过拷贝构造类的构造函数copy constructor
 	AEGP_SuiteHandler	suites(in_data->pica_basicP);
-
+	
+	//AEFX_SuiteScoper<PF_iterate16Suite1> a = AEFX_SuiteScoper<PF_iterate16Suite1>(in_data,"PF iterate16 Suite",1,out_data,"114514");
 	/*	Put interesting code here. */
 	disInfo disp;
+	//in_data->utils->get_pixel_data8();
 	AEFX_CLR_STRUCT(disp); 
 	//
-	PF_EventExtra extra;
-	extra.contextH;
-	PF_KeyDownEvent key;
-	key.keycode = PF_ControlCode_Backspace;
+	//PF_EventExtra extra;
+	//extra.contextH;
+	//extra.u.key_down.keycode;
+	//PF_KeyDownEvent key;
+	//key.keycode = PF_ControlCode_Backspace;
 	
-
+	//suites.MaskSuite4;
+	//注册ui
+	//PF_CustomUIInfo uifo;
+	//PF_REGISTER_UI(in_data,&uifo);
+	
+	//in_data->inter.register_ui(in_data->effect_ref,&uifo);
 
 
 	//
@@ -400,19 +461,20 @@ Render (
 	disp.center_y = FIX2INT(params[4]->u.td.y_value);
 	disp.isTransparent = params[5]->u.bd.value;
 	disp.angle = (-FIX2FLT( params[6]->u.ad.value))* PF_RAD_PER_DEGREE;//new*115/360/2
+	disp.repeat_mode = params[7]->u.pd.value;//复读机的模式
 	int time = in_data->current_time;
 	int step = in_data->time_step;
 	int scale = in_data->time_scale;
-	PF_CHECKOUT_PARAM(in_data, 3, time, step, scale, &disp.check);
+	ERR( PF_CHECKOUT_PARAM(in_data, 3, time, step, scale, &disp.check));//想要用图层的像素信息必须签出，最后 签入
 	//{
 		//disp.check.u.ld = params[0]->u.ld;
 	//}
 	A_long				linesL = 0;
 
-	linesL 		= output->extent_hint.bottom - output->extent_hint.top;
+	linesL 		= output->extent_hint.bottom - output->extent_hint.top;//上下界像素高度差
 	
-	if (disp.check.u.ld.data != NULL) {//����ѡͼ��Ϊnone��ʱ�����ʹ��Ұָ��
-		//�����Ǹ��ж������Ƿǳ���Ҫ��һ������������ѡ��noneʱ�ı�����Ҳ�����˽���ѡmapͼ��ɾ����ı���
+	if (disp.check.u.ld.data != NULL) {//当所选图层为none的时候避免使用野指针
+		//上面那个判断条件是非常重要的一步，他避免了选择none时的崩溃，也避免了将所选map图层删除后的崩溃
 		if (PF_WORLD_IS_DEEP(output)) {
 			ERR(suites.Iterate16Suite1()->iterate(in_data,
 				0,								// progress base
@@ -433,9 +495,13 @@ Render (
 				MySimpleGainFunc8,				// pixel function pointer
 				output));
 		}
+		//printf("success");
 	}
 	else PF_COPY(&params[0]->u.ld, output, NULL, &output->extent_hint);
 	ERR(PF_CHECKIN_PARAM(in_data, &disp.check));
+	//free(&suites);不要这样
+	err = DOLAG_ReleaseSuite(in_data, out_data, "Iterate 16 Suite", 1, "Failed to release Iterate 16 Suite");
+	err = DOLAG_ReleaseSuite(in_data, out_data, "Iterate 8 Suite", 1, "Failed to release Iterate 8 Suite");
 	return err;
 }
 
@@ -457,7 +523,7 @@ PF_Err PluginDataEntryFunction(
 		"ADBE Skeleton", // Match Name
 		"Sample Plug-ins", // Category
 		AE_RESERVED_INFO); // Reserved Info
-
+	//PF_SampPB;
 	return result;
 }
 
@@ -472,7 +538,16 @@ EffectMain(
 	void			*extra)
 {
 	PF_Err		err = PF_Err_NONE;
-	
+	/*AEGP_Command* icon;//aegps里的玩意，感觉没啥用
+	AEGP_CommandSuite1 cmdSuite;
+	cmdSuite.AEGP_GetUniqueCommand(icon);
+	//InsertMenuItem()
+	cmdSuite.AEGP_InsertMenuCommand(*icon, "drawUI", AEGP_Menu_WINDOW, AEGP_MENU_INSERT_SORTED);
+	cmdSuite.AEGP_EnableCommand(*icon);
+	AEGP_RegisterSuite5 rgstSuite;
+	//AEGP_GlobalRefcon 
+	//rgstSuite.AEGP_RegisterCommandHook(AEGP_HP_BeforeAE);
+	*/
 	try {
 		switch (cmd) {
 			case PF_Cmd_ABOUT:
@@ -499,6 +574,15 @@ EffectMain(
 									output);
 				break;
 				
+			/*case PF_Cmd_EVENT:
+
+				err = HandleEvent(in_data,
+					out_data,
+					params,
+					output,
+					reinterpret_cast<PF_EventExtra*>(extra));
+				break;
+			*/
 			case PF_Cmd_RENDER:
 
 				err = Render(	in_data,
