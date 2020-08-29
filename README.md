@@ -16,7 +16,7 @@
 
 ## Dynamics模式
 
-![dynamics params](G:\ae 插件 工程\ae 插件 笔记 版本信息\Intro\dynamics params.jpg)
+![dynamics params](.\Intro\dynamics params.jpg)
 
 在原有的四个模式下增加了Dynamics这个模式，使得像素能够通过置换map进行任意方向的移动
 
@@ -32,24 +32,28 @@
 
 ## 原理图示
 
-<img src="G:\ae 插件 工程\ae 插件 笔记 版本信息\Intro\src.jpg" alt="src" style="zoom:33%;" />
+<img src=".\Intro\src.jpg" alt="src" style="zoom:33%;" />
 
 <center>上图为原图
 
 
-<img src="G:\ae 插件 工程\ae 插件 笔记 版本信息\Intro\map1.jpg" style="zoom:33%;" />
+
+<img src=".\Intro\map1.jpg" style="zoom:33%;" />
 
 <center>例如上图是置换map(8bpc情况下)，上下左右中的颜色分别是(127,0.255),(127,255,255),(0,127,255),(255,127,255),(127,127,0),也就是上面部分向下置换，下面部分向上置换，左边部分向右置换，右边部分向左置换，中间部分不进行置换(因为blue分量为0)的收缩效果
 
 
-<img src="G:\ae 插件 工程\ae 插件 笔记 版本信息\Intro\result1.jpg" alt="result1" style="zoom: 50%;" />
+
+<img src=".\Intro\result1.jpg" alt="result1" style="zoom: 50%;" />
 
 <center>上图是置换后的结果
 
 
-![result2](G:\ae 插件 工程\ae 插件 笔记 版本信息\Intro\result2.jpg)
+
+![result2](.\Intro\result2.jpg)
 
 <center>将置换map给模糊一下，就做好了如上图的向中间收缩的置换效果
+
 
 
 ---
