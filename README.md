@@ -50,7 +50,7 @@
 
 
 
-![result2](.\Intro\result2.jpg)
+<img src=".\Intro\result1.jpg" alt="result1" style="zoom: 100%;" />
 
 <center>将置换map给模糊一下，就做好了如上图的向中间收缩的置换效果
 
